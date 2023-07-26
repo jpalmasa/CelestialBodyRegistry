@@ -1,0 +1,69 @@
+module Entities.Astronomy where
+
+import Entities.ActionRecording
+
+import DA.Optional
+import DA.Text as T
+
+template CelestialBody
+    with
+        issuer: Party
+        registrant: Party
+        cbData: CelestialBodyData
+        discoveryData: DiscoveryData
+        registryTime: Time
+    where
+        signatory issuer, registrant
+        key (issuer, cbData.name, cbData.catalogId, cbData.celestialBodyType)
+                : (Party, Text, Optional Text, CelestialBodyType)
+        maintainer key._1
+
+        ensure
+            issuer /= registrant && (fromOptional cbData.name cbData.catalogId) /= ""
+
+        choice UpdateBody : ContractId CelestialBody
+            with
+                newAstroData: CelestialBodyData
+            controller issuer, registrant
+            do
+                recordTime <- getTime
+                create ActionRecord with
+                    executedAction = DataUpdateSucess
+                    actor = issuer
+                    ..
+                create this with
+                    cbData = newAstroData
+
+data CelestialBodyData = CelestialBodyData with
+    name: Text
+    catalogId: Optional Text
+    celestialCoordinates: CelestialCoordinates
+    distanceFromEarth: Unit
+    mass: Unit
+    volume: Unit
+    celestialBodyType: CelestialBodyType
+ deriving (Eq, Show)
+
+data CelestialCoordinates = CelestialCoordinates with
+    ra:  Text
+    dec: Text
+ deriving (Eq, Show)
+
+data DiscoveryData = DiscoveryData with
+    date: Date
+    discovererName: Text
+ deriving (Eq, Show)
+
+data CelestialBodyType = Galaxy | Planet | Moon | Nebula | Star | Comet | Asteroid | Cluster | Other
+ deriving (Eq, Show)
+
+data Unit = Unit with
+    value: Decimal
+    unit: Text
+ deriving (Eq, Show)
+
+class IdAble celestialBodyKey id where
+    idAble: celestialBodyKey -> id
+
+instance IdAble CelestialBodyData Text where
+    idAble CelestialBodyData{..} = (T.take 1 (show celestialBodyType)) <> ":" <> fromOptional name catalogId

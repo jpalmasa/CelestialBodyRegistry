@@ -1,0 +1,106 @@
+module Entities.Registration where
+
+import Entities.Astronomy
+import Entities.ActionRecording
+
+import Daml.Script
+
+template AstronomicalBodyRegistration
+    with
+        issuer: Party
+        registrant: Party
+        cbData: CelestialBodyData
+        discoveryData: DiscoveryData
+    where
+        signatory issuer
+        observer registrant
+
+        ensure issuer /= registrant
+
+        choice Register: ContractId CelestialBody
+            controller issuer
+            do
+                time <- getTime
+
+                create ActionRecord with
+                    actor = issuer
+                    executedAction = RegistrationSuccess
+                    recordTime = time
+                    ..
+                
+                let newCelestialBody = CelestialBody with registryTime = time; ..
+                    bodyId: Text = idAble newCelestialBody.cbData
+
+                trace ("Astronomical Body with Id " <> bodyId <> " successfully registered.")
+                    $ create CelestialBody with registryTime = time; ..
+
+template RegistrationService
+    with
+        issuer: Party
+        issuerName: Text
+    where
+        signatory issuer
+        key issuer : Party
+        maintainer key
+
+        nonconsuming choice RegisterAstronomicalBody: ContractId AstronomicalBodyRegistration
+            with
+                registrant: Party
+                cbData: CelestialBodyData
+                discoveryData: DiscoveryData
+            controller issuer, registrant
+            do
+                recordTime <- getTime
+
+                create ActionRecord with
+                    actor = registrant
+                    executedAction = RegistrationAttempt
+                    ..
+
+                create AstronomicalBodyRegistration with ..
+
+        nonconsuming choice AcceptRegistration: ContractId CelestialBody
+            with
+                registrationCid: ContractId AstronomicalBodyRegistration
+            controller issuer
+            do
+                now <- getTime
+                --AstronomicalBodyRegistration{..} <- fetch registrationCid
+
+                create ActionRecord with
+                    actor = issuer
+                    executedAction = RegistrationAttempt
+                    recordTime = now
+                    ..
+
+                debug "Astronomical Body registration accepted Successfully."
+                exercise registrationCid Register
+
+
+        nonconsuming choice RevokeRegistration: ()
+            with
+                registrationCid: ContractId AstronomicalBodyRegistration
+            controller issuer
+            do
+                now <- getTime
+
+                create ActionRecord with
+                    actor = issuer
+                    executedAction = RegistrationAttempt
+                    recordTime = now
+                    ..
+
+                archive registrationCid
+                debug "Astronomical Body registration was Revoked."
+
+
+data Parties = Parties with
+    issuer: Party
+    registrant: Party 
+
+setupParties: Script Parties
+setupParties = script do
+    issuer <- allocateParty "Nasa"
+    registrant <- allocateParty "Galileu"
+
+    pure Parties with ..

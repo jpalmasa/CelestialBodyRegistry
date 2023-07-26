@@ -1,0 +1,17 @@
+module Entities.ActionRecording where
+
+template ActionRecord
+    with
+        issuer: Party
+        actor: Party
+        executedAction: ActionType
+        recordTime: Time
+    where
+        signatory issuer
+        observer actor
+
+data ActionType =
+    RegistrationAttempt | RegistrationSuccess | RegistrationAcceptance | RegistrationRejection |
+    DataUpdateAttempt | DataUpdateSucess | DataUpdateAcceptance | DataUpdateRejection |
+    Revocation 
+ deriving (Eq, Show)
