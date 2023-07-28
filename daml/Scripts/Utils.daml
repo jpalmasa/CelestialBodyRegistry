@@ -1,14 +1,36 @@
-module Utils where
+module Scripts.Utils where
 
 import Daml.Script
 
 data Parties = Parties with
     issuer: Party
-    discoverer: Party 
+    individualDiscoverer1: Party 
+    individualDiscoverer2: Party
+    organizationDiscoverer: Party
 
-setupParties: (Text, Text) -> Text ->  Script Parties
-setupParties (issuerName, discovererName) discovererHint = script do
-    issuer <- allocateParty issuerName
-    discoverer <- allocatePartyWithHint discovererName (PartyIdHint discovererHint)
+setupParties = script do
+    issuer <- allocatePartyWithHint "Issuer" (PartyIdHint "ISS") 
+    individualDiscoverer1 <- allocatePartyWithHint "Clyde Tombaugh" (PartyIdHint "CT") 
+    individualDiscoverer2 <- allocatePartyWithHint "Charles Messier" (PartyIdHint "CM") 
+    organizationDiscoverer <- allocatePartyWithHint "NASA" (PartyIdHint "NS") 
 
     pure Parties with ..
+
+setupUsers = script do
+    userParties@Parties{..} <- setupParties
+
+    issuerId <- validateUserId "AstronomyCommitte"   
+    individualDiscoverer1Id <- validateUserId "Clyde"   
+    individualDiscoverer2Id <- validateUserId "Charles"
+    organizationDiscovererId <- validateUserId "nasa"
+
+    createUser (User issuerId (Some issuer)) [CanActAs issuer]  
+    -- In this case and to ensure some choices that require both issuer and discoverer control work on Navigator
+    createUser (User individualDiscoverer1Id (Some individualDiscoverer1))
+        [CanActAs individualDiscoverer1, CanActAs issuer]  
+    createUser (User individualDiscoverer2Id (Some individualDiscoverer2))
+        [CanActAs individualDiscoverer2, CanActAs issuer]  
+    createUser (User organizationDiscovererId (Some organizationDiscoverer))
+        [CanActAs organizationDiscoverer, CanActAs issuer]  
+
+    pure userParties

@@ -1,6 +1,7 @@
 module Entities.Discovery where
 
 import DA.List (unique)
+import DA.Text as T (length) 
 
 template Discoverer
     with
@@ -9,8 +10,10 @@ template Discoverer
         discoveries: [DiscoveryData]
     where
         ensure
+            unique discoveries &&
             issuer /= discovererData.discovererParty &&
-            unique discoveries
+            T.length discovererData.name >= 3 &&
+            discoveries /= []
 
         signatory issuer
         observer discovererData.discovererParty

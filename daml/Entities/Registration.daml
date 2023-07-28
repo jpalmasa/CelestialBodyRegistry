@@ -19,7 +19,9 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
         signatory issuer
 
         ensure
-            unique registeredDiscoveries
+            unique registeredDiscoveries &&
+            T.length issuerName >= 3 &&
+            foldr ((&&) . validateCbId) True registeredDiscoveries -- Ensure all discoveries have valid Ids
           
         key (issuer, issuerName): (Party, Text)
         maintainer key._1
@@ -31,13 +33,9 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
             controller issuer
             do
                 let cBId: Text = idAble cbData
-                    allDiscoveriesAreValid = foldr ((&&) . validateCbId) True registeredDiscoveries -- Ensure all discoveries have valid Ids
 
                 debug $
                     "Running ProcessAstronomicalBodyRegistration assertions for cbid: " <> cBId <> " and discoverer " <> show discovererData
-                assertMsg "Issuer's name is an empty string" $ issuerName /= ""
-                assertMsg "Issuer's name must have more than 3 characters" $ T.length issuerName >= 3
-                assertMsg "Astronomy Committe has discoveries with invalid Ids" allDiscoveriesAreValid
 
                 recordTime <- getTime
                 try do
@@ -172,7 +170,7 @@ template AstronomicalBodyRegistration
 
                 debug "Running RegisterCelestialBodyAndDiscoverer assertion"
                 assertMsg "Unathorized activity. The wrong committe is involved in Celestial Body's registration" 
-                    $ issuer /= committe.issuer
+                    $ issuer == committe.issuer
 
                 now <- getTime
                 try do

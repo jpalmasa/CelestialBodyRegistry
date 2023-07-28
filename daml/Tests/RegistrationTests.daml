@@ -4,8 +4,7 @@ import Entities.Registration
 
 import Daml.Script
 
-createRegistrationService: (Party, Text) -> Script (ContractId AstronomyCommitte)
-createRegistrationService (issuer, issuerName) = script do
+createAstronomyCommitte: (Party, Text) -> Script (ContractId AstronomyCommitte)
+createAstronomyCommitte (issuer, issuerName) = script do
     submit issuer do
         createCmd AstronomyCommitte with registeredDiscoveries = []; ..
-

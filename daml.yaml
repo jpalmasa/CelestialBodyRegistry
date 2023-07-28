@@ -1,6 +1,7 @@
 sdk-version: 2.6.5
 name: CelestialBodyRegistry
 source: daml
+init-script: Utils:setupUsers
 version: 0.0.1
 dependencies:
   - daml-prim
@@ -8,5 +9,3 @@ dependencies:
   - daml-script
 sandbox-options:
   - --wall-clock-time
-exposed-modules:
-  - Main

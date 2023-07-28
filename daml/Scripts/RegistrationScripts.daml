@@ -1,0 +1,40 @@
+module Scripts.RegistrationScripts where
+
+import Entities.Registration (AstronomyCommitte(..))
+import Entities.Discovery
+
+import Scripts.Utils
+
+import Daml.Script
+import DA.Date as D
+
+setupUsersAndAstronomyCommitte = script do
+    Parties{issuer}<- setupUsers
+    submit issuer do 
+        createAstronomyCommitteCmd (issuer, "AstronomyCommitte") []
+
+failed_shortNamedAstronomyCommitte = script do
+    Parties{issuer} <- setupUsers
+    submitMustFail issuer do 
+        createAstronomyCommitteCmd (issuer, "AC") []
+
+failed_duplicatedDiscoveriesAstronomyCommitte = script do
+    Parties{issuer, individualDiscoverer1}<- setupUsers
+    let discoveryData =
+            DiscoveryData with
+                id = "Mi:Pluto"
+                date = D.date 1930 D.Feb 18
+    submitMustFail issuer do 
+        createAstronomyCommitteCmd (issuer, "AstronomyCommitte") [discoveryData, discoveryData]
+
+failed_invalidDiscoveryIdAstronomyCommitte = script do
+    Parties{issuer, individualDiscoverer1}<- setupUsers
+    let discoveryData1 =
+            DiscoveryData with
+                id = "Bla:Pluto"
+                date = D.date 1930 D.Feb 18
+    submitMustFail issuer do 
+        createAstronomyCommitteCmd (issuer, "AstronomyCommitte") [discoveryData1]
+
+createAstronomyCommitteCmd (issuer, issuerName) registeredDiscoveries=
+    createCmd AstronomyCommitte with ..
