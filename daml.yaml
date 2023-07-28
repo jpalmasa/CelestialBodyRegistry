@@ -1,5 +1,5 @@
 sdk-version: 2.6.5
-name: StarRegistry
+name: CelestialBodyRegistry
 source: daml
 version: 0.0.1
 dependencies:
@@ -8,3 +8,5 @@ dependencies:
   - daml-script
 sandbox-options:
   - --wall-clock-time
+exposed-modules:
+  - Main

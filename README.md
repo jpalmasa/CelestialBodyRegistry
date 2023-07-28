@@ -1,4 +1,4 @@
-# Star Registry - Decentralized Star Ownership Registry
+# Celestial Body Registry - Decentralized Celestial Body Discovery Ownership Registry
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -10,30 +10,28 @@
 - [License](#license)
 
 ## Introduction
-Star Registry is a decentralized application (dApp) built on DAML, allowing users to register and claim ownership of virtual stars on the blockchain. Each registered star is represented by a unique Non-Fungible Token (NFT), ensuring a one-of-a-kind celestial artifact. Users can trade, transfer, and buy/sell these virtual stars within the platform.
+Celestial Body Registry is a decentralized application built on DAML, allowing individual or organizational users to register and update the data of a Celestial Body (CB) and claim it's discovery in the astronomy committe they are inserted, all registered onto a ledger. Each registered CB is represented as a contract, as well as it's discoverer and the astronomy committe where it's included.
+Discoverer users can register and update the celestial bodies they submit.
+The astronomy committe on the other hand are involved in the registration and udpate process, being that it's the party that accepts or revokes registration attempts.
 
 ## Project Overview
-The Star Registry project aims to create a user-friendly and transparent platform where users can experience a unique virtual star ownership experience. The project facilitates the following key functionalities:
+The Celestial Body Registry project aims to create a user-friendly and transparent platform where users can experience a unique virtual celestial body discovery ownership experience. The project facilitates the following key functionalities:
 
-- Star Registration: Users can register a star by providing specific star details, such as its name, coordinates, and any personal messages or dedications.
+- CB Registration: Users can register a CB by providing specific details, such as its name, celestial coordinates, category, etc. A particular CB has a unique id based on it's category, name or catalogue Id.
 
-- Unique NFTs: Each registered star is represented by an NFT, making it verifiably unique and distinguishable from other stars in the registry.
+- Discovery Ownership: Each registered CB is associated with a discovery and discoverer making it verifiably unique, distinguishable, nontransfarable from other stars in the registry. 
 
-- Ownership Transfer: Users can transfer the ownership of their registered stars to others, making it an ideal gifting option or a token of appreciation.
-
-- Star Marketplace: The platform includes a decentralized marketplace where users can buy and sell registered stars.
+- Data Update: Further research and data may be 
 
 ## Features
-- Register Stars: Users can register their favorite stars with unique names and messages.
+- Register Stars: Users can register and update their CB.
 
-- NFT Representation: Each registered star is minted as a unique NFT on the DAML platform.
+- Discovery Representation: Each registered CB is registered as a discovery.
 
-- Star Marketplace: Users can list their registered stars for sale or purchase stars from other users.
-
-- Transfer Ownership: Users can transfer the ownership of their registered stars to other DAML parties.
+- Astronomy Committe: A committe user issues all discoveries, and evaluates and helps registering all CBs
 
 ## Getting Started
-To get started with the Star Registry dApp, follow the steps below:
+To get started with the Celestial Body Registry dApp, follow the steps below:
 
 1. Clone the Star Registry repository:
 
@@ -57,7 +55,8 @@ daml start
 
 2. Mint your first Astro NFT or explore the marketplace to find and trade unique celestial artifacts.
 
-### Smart Contract
-The Star Registry smart contract is written in DAML, a domain-specific language for smart contracts. It defines the logic for minting, transferring, and trading Star Registry. The contract models NFT ownership using DAML parties, ensuring secure and transparent ownership.
-
-The smart contract can be found in the daml/ directory.
+### Testing
+Run the following command to run tests after performing the previous described step
+```
+daml test
+```

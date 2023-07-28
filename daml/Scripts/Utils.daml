@@ -4,11 +4,11 @@ import Daml.Script
 
 data Parties = Parties with
     issuer: Party
-    registrantDiscoverer: Party 
+    discoverer: Party 
 
 setupParties: (Text, Text) -> Text ->  Script Parties
-setupParties (issuerName, registrantName) registrantHint = script do
+setupParties (issuerName, discovererName) discovererHint = script do
     issuer <- allocateParty issuerName
-    registrantDiscoverer <- allocatePartyWithHint registrantName (PartyIdHint registrantHint)
+    discoverer <- allocatePartyWithHint discovererName (PartyIdHint discovererHint)
 
     pure Parties with ..
