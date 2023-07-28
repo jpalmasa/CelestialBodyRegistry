@@ -1,47 +1,92 @@
 module Entities.Astronomy where
 
-import Entities.ActionRecording
+import Entities.Logging
+import Entities.Discovery
 
 import DA.Optional
 import DA.Text as T
+import DA.List ((!!))
 
 template CelestialBody
     with
         issuer: Party
-        registrant: Party
+        discovererData: DiscovererData
         cbData: CelestialBodyData
         discoveryData: DiscoveryData
         registryTime: Time
     where
-        signatory issuer, registrant
-        key (issuer, cbData.name, cbData.catalogId, cbData.celestialBodyType)
-                : (Party, Text, Optional Text, CelestialBodyType)
+        signatory issuer, discovererData.discovererParty
+        key (issuer, discoveryData.id) : (Party, Text)
         maintainer key._1
 
         ensure
-            issuer /= registrant && (fromOptional cbData.name cbData.catalogId) /= ""
+            issuer /= discovererData.discovererParty &&
+            idAble cbData /= "" && validateCbId discoveryData &&
+            cbData.celestialBodyProperties.celestialCoordinates.ra /= "" &&
+            cbData.celestialBodyProperties.celestialCoordinates.dec /= "" &&
+            biggerThanZero cbData.celestialBodyProperties.mass &&
+            biggerThanZero cbData.celestialBodyProperties.distanceFromEarth && 
+            biggerThanZero cbData.celestialBodyProperties.apparentMagnitude
 
-        choice UpdateBody : ContractId CelestialBody
+        preconsuming choice IndividualDiscovererUpdatesCelestialBodyProperties: ContractId CelestialBody
             with
-                newAstroData: CelestialBodyData
-            controller issuer, registrant
+                newCBProperties: CelestialBodyProperties
+                reason: Text
+            controller issuer, discovererData.discovererParty
             do
+                debug "Running IndividualDiscovererUpdatesCelestialBodyProperties assertions"
+                assertMsg "Reason for an individual discoverer to update celestial body's data must not be an empty text." $ reason /= ""
+                assertMsg "Discoverer is not an individual, thus it must execute OrganizationDiscovererUpdatesCelestialBody, instead"
+                    $ discovererData.entityType == Individual
+                assertMsg "Replicated Data" $ cbData.celestialBodyProperties /= newCBProperties
+
                 recordTime <- getTime
-                create ActionRecord with
+
+                create ActionRecordLog with
                     executedAction = DataUpdateSucess
-                    actor = issuer
+                    actor = discovererData.discovererParty
+                    optReason = Some reason
                     ..
-                create this with
-                    cbData = newAstroData
+                trace "Individual discoverer updated it's discovered celestial body." $
+                    create this with
+                        cbData.celestialBodyProperties = newCBProperties
+
+        preconsuming choice OrganizationDiscovererUpdatesCelestialBodyProperties: (ContractId CelestialBody)
+            with
+                newCBProperties: CelestialBodyProperties
+                reason: Text
+            controller discovererData.discovererParty
+            do
+                debug "Running OrganizationDiscovererUpdatesCelestialBodyProperties assertions"
+                assertMsg "Reason for an organization to update it's discovered celestial body data must not be an empty text." $ reason /= ""
+                assertMsg "Discoverer is not an organization, thus it must execute IndividualDiscovererUpdatesCelestialBody, instead"
+                    $ discovererData.entityType == Organization
+                assertMsg "Replicated Data" $ cbData.celestialBodyProperties /= newCBProperties
+                
+                recordTime <- getTime
+
+                create ActionRecordLog with
+                    executedAction = DataUpdateSucess
+                    actor = discovererData.discovererParty
+                    optReason = Some reason
+                    ..
+
+                trace "Organization updated it's discovered celestial body." $
+                    create this with
+                        cbData.celestialBodyProperties = newCBProperties
 
 data CelestialBodyData = CelestialBodyData with
     name: Text
     catalogId: Optional Text
+    celestialBodyProperties: CelestialBodyProperties
+    celestialBodyCategory: CelestialBodyCategory
+ deriving (Eq, Show)
+
+data CelestialBodyProperties = CelestialBodyProperties with
     celestialCoordinates: CelestialCoordinates
-    distanceFromEarth: Unit
-    mass: Unit
-    volume: Unit
-    celestialBodyType: CelestialBodyType
+    distanceFromEarth: PhysicalGrandeur
+    mass: PhysicalGrandeur
+    apparentMagnitude: PhysicalGrandeur
  deriving (Eq, Show)
 
 data CelestialCoordinates = CelestialCoordinates with
@@ -49,21 +94,53 @@ data CelestialCoordinates = CelestialCoordinates with
     dec: Text
  deriving (Eq, Show)
 
-data DiscoveryData = DiscoveryData with
-    date: Date
-    discovererName: Text
+data CelestialBodyCategory = Galaxy | Planet | MinorPlanet | Moon | Nebula | Star | Comet | Asteroid | Cluster | Unknown
  deriving (Eq, Show)
 
-data CelestialBodyType = Galaxy | Planet | Moon | Nebula | Star | Comet | Asteroid | Cluster | Other
- deriving (Eq, Show)
-
-data Unit = Unit with
+data PhysicalGrandeur = PhysicalGrandeur with
     value: Decimal
-    unit: Text
+    unit: Unit
  deriving (Eq, Show)
 
-class IdAble celestialBodyKey id where
-    idAble: celestialBodyKey -> id
+data Unit = DistanceUnit | MassUnit | ApparentMagnitudeUnit | UnknownUnit
+ deriving (Eq, Show)
+
+data DistanceUnit = Km | LightYear | AU
+ deriving (Eq, Show)
+
+data MassUnit = Kg | SolasMass
+ deriving (Eq, Show)
+
+data ApparentMagnitudeUnit = WattPerSquareMeter
+ deriving (Eq, Show)
+
+class IdAble celestialBodyData id where
+    idAble: celestialBodyData -> id
 
 instance IdAble CelestialBodyData Text where
-    idAble CelestialBodyData{..} = (T.take 1 (show celestialBodyType)) <> ":" <> fromOptional name catalogId
+    idAble CelestialBodyData{..} = (T.take 2 (show celestialBodyCategory)) <> ":" <> fromOptional name catalogId -- Id either uses the name or catalogId
+
+class BiggerThanZeroProperty celestialBodyData eval where
+    biggerThanZero: celestialBodyData -> eval
+
+instance BiggerThanZeroProperty PhysicalGrandeur Bool where
+    biggerThanZero PhysicalGrandeur{value} = value > 0.0
+
+class KnownUnitProperty celestialBodyData eval where
+    knownUnit: celestialBodyData -> eval
+
+instance KnownUnitProperty PhysicalGrandeur Bool where
+    knownUnit PhysicalGrandeur{unit} = unit /= UnknownUnit
+
+class ValidCbId id b where
+    validateCbId: id -> b
+
+instance ValidCbId DiscoveryData Bool where
+    validateCbId DiscoveryData{id} = 
+        let thirdCharIsColon = ((T.explode id) !! 3) == ":"
+            firstTwoCharValid = (T.take 2 id) `elem` possiblePrefixOfCbId
+        in
+            thirdCharIsColon && firstTwoCharValid
+
+possiblePrefixOfCbId: [Text]
+possiblePrefixOfCbId = ["Ga", "Pl", "Mi", "Mo", "Ne", "St", "Co", "As", "Cl", "Un"]

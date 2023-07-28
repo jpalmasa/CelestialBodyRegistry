@@ -1,0 +1,11 @@
+module Tests.RegistrationTests where
+
+import Entities.Registration
+
+import Daml.Script
+
+createRegistrationService: (Party, Text) -> Script (ContractId AstronomyCommitte)
+createRegistrationService (issuer, issuerName) = script do
+    submit issuer do
+        createCmd AstronomyCommitte with registeredDiscoveries = []; ..
+

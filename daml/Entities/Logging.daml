@@ -1,0 +1,39 @@
+module Entities.Logging where
+
+template ActionRecordLog
+    with
+        issuer: Party
+        actor: Party
+        executedAction: ActionType
+        optReason: Optional Text
+        recordTime: Time
+    where
+        signatory issuer
+        observer actor
+
+template ErrorLog
+    with
+        issuer: Party
+        actor: Party
+        errorId: ErrorId
+        errorMessage: Text
+        recordTime: Time
+    where
+        signatory issuer
+        observer actor
+
+data ActionType =
+    RegistrationAttempt | RegistrationSuccess | RegistrationAcceptance | RegistrationRejection |
+    DataUpdateAttempt | DataUpdateSucess | DataUpdateAcceptance | DataUpdateRejection |
+    Revocation 
+ deriving (Eq, Show)
+
+data ErrorId =
+    E0001 |     -- Precondition Failed Id
+    E0002       -- General Error Id
+ deriving (Ord, Eq, Show)
+
+createErrorLog errorId exMessage issuer actor recordTime =
+    create ErrorLog with
+        errorMessage = exMessage
+        ..

@@ -1,106 +1,221 @@
 module Entities.Registration where
 
 import Entities.Astronomy
-import Entities.ActionRecording
+import Entities.Discovery
+import Entities.Logging
 
 import Daml.Script
+import DA.Text as T
+import DA.Date (toDateUTC)
+import DA.Exception (PreconditionFailed(PreconditionFailed), GeneralError(GeneralError))
+import DA.List (delete, unique)
+
+template AstronomyCommitte -- Committe Entities responsible for registering astronomy discoveries and that keep them for themselves 
+    with
+        issuer: Party
+        issuerName: Text
+        registeredDiscoveries: [DiscoveryData]
+    where
+        signatory issuer
+
+        ensure
+            unique registeredDiscoveries
+          
+        key (issuer, issuerName): (Party, Text)
+        maintainer key._1
+
+        nonconsuming choice ProcessAstronomicalBodyRegistration: Either (ContractId ErrorLog) (ContractId AstronomicalBodyRegistration)
+            with
+                cbData: CelestialBodyData
+                discovererData: DiscovererData
+            controller issuer
+            do
+                let cBId: Text = idAble cbData
+                    allDiscoveriesAreValid = foldr ((&&) . validateCbId) True registeredDiscoveries -- Ensure all discoveries have valid Ids
+
+                debug $
+                    "Running ProcessAstronomicalBodyRegistration assertions for cbid: " <> cBId <> " and discoverer " <> show discovererData
+                assertMsg "Issuer's name is an empty string" $ issuerName /= ""
+                assertMsg "Issuer's name must have more than 3 characters" $ T.length issuerName >= 3
+                assertMsg "Astronomy Committe has discoveries with invalid Ids" allDiscoveriesAreValid
+
+                recordTime <- getTime
+                try do
+                    let createNewAction actor executedAction = ActionRecordLog with optReason = None; ..
+                        today = toDateUTC recordTime
+
+                    actionLogCid <- create $ createNewAction discovererData.discovererParty RegistrationAttempt
+                    regCid <-
+                        create AstronomicalBodyRegistration with
+                            discoveryData = DiscoveryData with
+                                id = cBId
+                                date = today
+                            ..
+
+                    pure $ trace ("A process to register a " <> show cBId <> " celestial body discovery has started.") $ Right regCid
+                catch
+                    PreconditionFailed ex -> do
+                        newErrorLogCid <- createErrorLog E0001 ex issuer discovererData.discovererParty recordTime
+                        pure $ Left newErrorLogCid
+                    GeneralError ex -> do
+                        newErrorLogCid <- createErrorLog E0002 ex issuer discovererData.discovererParty recordTime
+                        pure $ Left newErrorLogCid
+
+        nonconsuming choice AcceptRegistrationAndCreateCB:
+            Either (ContractId ErrorLog) (ContractId CelestialBody, ContractId AstronomyCommitte, ContractId Discoverer)
+            with
+                registrationCid: ContractId AstronomicalBodyRegistration
+                discovererParty: Party
+            controller issuer, discovererParty
+            do
+                now <- getTime
+
+                create ActionRecordLog with
+                    actor = issuer
+                    executedAction = RegistrationAttempt
+                    recordTime = now
+                    optReason = None
+                    ..
+
+                debug "Celestial Body registration accepted. It will now be created along with registering the discoverer's achievement."
+                exercise registrationCid RegisterCelestialBodyAndDiscoverer with
+                    committeCid = self
+
+        nonconsuming choice RevokeRegistration: Optional (ContractId ErrorLog)
+            with
+                registrationCid: ContractId AstronomicalBodyRegistration
+                reason: Text
+            controller issuer
+            do
+                now <- getTime
+                try do
+                    debug "Running RevokeRegistration assertion"
+                    assertMsg "Reason for Revocation of Registration must not be an empty text." $ reason /= ""
+
+                    create ActionRecordLog with
+                        actor = issuer
+                        executedAction = RegistrationAttempt
+                        recordTime = now
+                        optReason = Some reason
+                        ..
+
+                    archive registrationCid
+                    
+                    pure $ trace "Astronomical Body registration was Revoked." None
+                catch
+                    GeneralError ex -> do
+                        newErrorLogCid <- createErrorLog E0002 ex issuer issuer now
+                        pure $ Some newErrorLogCid
+
+        preconsuming choice UpdateCelestialBodyData:
+            (ContractId CelestialBody, ContractId AstronomyCommitte, ContractId Discoverer)
+            with
+                oldCBId: Text
+                discovererParty: Party
+                newCBData: CelestialBodyData
+                reason: Text
+            controller issuer, discovererParty
+            do
+                debug $ "Running UpdateCelestialBody assertions for cbid: " <> show oldCBId <> "and discoverer" <> show discovererParty
+                assertMsg "Reason for a celestial body's data to be updated must not be an empty text." $ reason /= ""
+
+                (cBCid, cB@CelestialBody{cbData = CelestialBodyData{celestialBodyCategory}, discoveryData}) <-
+                    fetchByKey @CelestialBody (issuer, oldCBId)
+                (discCid, disc@Discoverer{discoveries, discovererData = DiscovererData{..}}) <- fetchByKey @Discoverer (issuer, discovererParty)
+                if celestialBodyCategory == newCBData.celestialBodyCategory then do -- simple data update, so neither committe or discoverer need to be changed
+                    debug $ oldCBId <> "Celestial Body's properties were updated."
+                    newCBCid <- case entityType of
+                        Individual ->
+                            exercise cBCid IndividualDiscovererUpdatesCelestialBodyProperties with
+                                    newCBProperties = newCBData.celestialBodyProperties; ..
+                        Organization ->
+                            exercise cBCid OrganizationDiscovererUpdatesCelestialBodyProperties with
+                                newCBProperties = newCBData.celestialBodyProperties; ..
+
+                    pure $ trace (oldCBId <> "Celestial Body's data was updated.") $ (newCBCid, self, discCid)
+                else do
+                    assertMsg "Unexpected error. Discovery data to update does not exist on committe" $ elem discoveryData registeredDiscoveries
+                    assertMsg "Unexpected error. Discovery data to update does not exist on discoverer" $ elem discoveryData discoveries
+
+                    archive cBCid
+                    archive discCid
+                    
+                    let newDiscoveryData = cB.discoveryData with id = idAble newCBData
+                        newRegisteredDiscoveries = (delete discoveryData registeredDiscoveries) ++ [newDiscoveryData]
+                        newDiscovererDiscoveries = (delete discoveryData discoveries) ++ [newDiscoveryData]
+                    
+                    newCBCid <- create cB with cbData = newCBData
+                    newCommitteCid <- create this with registeredDiscoveries = newRegisteredDiscoveries
+                    newDiscovererCid <- create disc with discoveries = newDiscovererDiscoveries
+
+                    pure $ trace (oldCBId <> "Celestial Body's data was updated.") $ (newCBCid, newCommitteCid, newDiscovererCid)
 
 template AstronomicalBodyRegistration
     with
         issuer: Party
-        registrant: Party
         cbData: CelestialBodyData
         discoveryData: DiscoveryData
+        discovererData: DiscovererData
     where
         signatory issuer
-        observer registrant
+        observer discovererData.discovererParty
 
-        ensure issuer /= registrant
+        ensure issuer /= discovererData.discovererParty
 
-        choice Register: ContractId CelestialBody
-            controller issuer
-            do
-                time <- getTime
-
-                create ActionRecord with
-                    actor = issuer
-                    executedAction = RegistrationSuccess
-                    recordTime = time
-                    ..
-                
-                let newCelestialBody = CelestialBody with registryTime = time; ..
-                    bodyId: Text = idAble newCelestialBody.cbData
-
-                trace ("Astronomical Body with Id " <> bodyId <> " successfully registered.")
-                    $ create CelestialBody with registryTime = time; ..
-
-template RegistrationService
-    with
-        issuer: Party
-        issuerName: Text
-    where
-        signatory issuer
-        key issuer : Party
-        maintainer key
-
-        nonconsuming choice RegisterAstronomicalBody: ContractId AstronomicalBodyRegistration
+        choice RegisterCelestialBodyAndDiscoverer:
+            Either (ContractId ErrorLog) (ContractId CelestialBody, ContractId AstronomyCommitte, ContractId Discoverer)
             with
-                registrant: Party
-                cbData: CelestialBodyData
-                discoveryData: DiscoveryData
-            controller issuer, registrant
+                committeCid: ContractId AstronomyCommitte
+            controller issuer, discovererData.discovererParty
             do
-                recordTime <- getTime
+                committe <- fetch committeCid
 
-                create ActionRecord with
-                    actor = registrant
-                    executedAction = RegistrationAttempt
-                    ..
+                debug "Running RegisterCelestialBodyAndDiscoverer assertion"
+                assertMsg "Unathorized activity. The wrong committe is involved in Celestial Body's registration" 
+                    $ issuer /= committe.issuer
 
-                create AstronomicalBodyRegistration with ..
-
-        nonconsuming choice AcceptRegistration: ContractId CelestialBody
-            with
-                registrationCid: ContractId AstronomicalBodyRegistration
-            controller issuer
-            do
                 now <- getTime
-                --AstronomicalBodyRegistration{..} <- fetch registrationCid
+                try do
+                    let newCelestialBody = CelestialBody with registryTime = now; ..
+                        bodyId: Text = idAble newCelestialBody.cbData
+                        today = toDateUTC now
+                        newDiscoveryData = DiscoveryData with
+                            id = bodyId
+                            date = today
+                        
+                    cbCid <- create newCelestialBody
 
-                create ActionRecord with
-                    actor = issuer
-                    executedAction = RegistrationAttempt
-                    recordTime = now
-                    ..
+                    discovererCid <- lookupByKey @Discoverer (issuer, discovererData.discovererParty) >>= \case
+                        Some discovererCid -> do
+                            let today = toDateUTC now
+                            discoverer <- fetch discovererCid
+                            archive discovererCid
+                            create discoverer with
+                                discoveries = discoverer.discoveries ++ [newDiscoveryData]
+                        None -> create Discoverer with discoveries = [newDiscoveryData]; ..
 
-                debug "Astronomical Body registration accepted Successfully."
-                exercise registrationCid Register
+                    create ActionRecordLog with
+                        actor = issuer
+                        executedAction = RegistrationSuccess
+                        recordTime = now
+                        optReason = None
+                        ..
+                    
+                    archive committeCid
+                    aCCid <- create committe with
+                        registeredDiscoveries = committe.registeredDiscoveries ++ [discoveryData]
+
+                    pure $ Right $ trace ("Astronomical Body with Id " <> bodyId <> " successfully registered.") (cbCid, aCCid, discovererCid)
+                catch
+                    PreconditionFailed ex -> do
+                        newErrorLogCid <- createErrorLog E0001 ex issuer discovererData.discovererParty now
+                        pure $ Left newErrorLogCid
+                    GeneralError ex -> do
+                        newErrorLogCid <- createErrorLog E0002 ex issuer discovererData.discovererParty now
+                        pure $ Left newErrorLogCid
 
 
-        nonconsuming choice RevokeRegistration: ()
-            with
-                registrationCid: ContractId AstronomicalBodyRegistration
-            controller issuer
-            do
-                now <- getTime
-
-                create ActionRecord with
-                    actor = issuer
-                    executedAction = RegistrationAttempt
-                    recordTime = now
-                    ..
-
-                archive registrationCid
-                debug "Astronomical Body registration was Revoked."
-
-
-data Parties = Parties with
-    issuer: Party
-    registrant: Party 
-
-setupParties: Script Parties
-setupParties = script do
-    issuer <- allocateParty "Nasa"
-    registrant <- allocateParty "Galileu"
-
-    pure Parties with ..
+createAstronomyCommitte: (Party, Text) -> [DiscoveryData] -> Script (ContractId AstronomyCommitte)
+createAstronomyCommitte (issuer, issuerName) registeredDiscoveries = script do
+    submit issuer do
+        createCmd AstronomyCommitte with ..

@@ -1,5 +1,5 @@
 sdk-version: 2.6.5
-name: AstroNfts2
+name: StarRegistry
 source: daml
 version: 0.0.1
 dependencies:

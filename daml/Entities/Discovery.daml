@@ -1,0 +1,33 @@
+module Entities.Discovery where
+
+import DA.List (unique)
+
+template Discoverer
+    with
+        issuer: Party
+        discovererData: DiscovererData
+        discoveries: [DiscoveryData]
+    where
+        ensure
+            issuer /= discovererData.discovererParty &&
+            unique discoveries
+
+        signatory issuer
+        observer discovererData.discovererParty
+
+        key (issuer, discovererData.discovererParty): (Party, Party)
+        maintainer key._1
+
+data DiscoveryData = DiscoveryData with
+    id: Text -- Discovered Celestial Body's id
+    date: Date
+ deriving (Eq, Show, Ord)
+
+data DiscovererData = DiscovererData with
+    discovererParty: Party
+    name: Text
+    entityType: EntityType
+ deriving (Eq, Show)
+
+data EntityType = Individual | Organization -- Individual requires issuer to update data, while an Organization does not
+ deriving (Eq, Show)

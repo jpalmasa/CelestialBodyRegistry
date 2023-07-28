@@ -1,0 +1,14 @@
+module Utils where
+
+import Daml.Script
+
+data Parties = Parties with
+    issuer: Party
+    registrantDiscoverer: Party 
+
+setupParties: (Text, Text) -> Text ->  Script Parties
+setupParties (issuerName, registrantName) registrantHint = script do
+    issuer <- allocateParty issuerName
+    registrantDiscoverer <- allocatePartyWithHint registrantName (PartyIdHint registrantHint)
+
+    pure Parties with ..
