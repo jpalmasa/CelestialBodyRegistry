@@ -1,11 +1,11 @@
 sdk-version: 2.6.5
 name: CelestialBodyRegistry
 source: daml
-init-script: Utils:setupUsers
+init-script: TestScripts.Utils:setupUsers
 version: 0.0.1
 dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
-sandbox-options:
-  - --wall-clock-time
+build-options: ["--ghc-option", "-Werror",
+                "--ghc-option", "-v"]
