@@ -1,0 +1,171 @@
+module TestScripts.Main where
+
+import Entities.Registration
+import Entities.Discovery
+import Entities.Astronomy
+import Entities.Logging
+
+import TestScripts.Utils
+import TestScripts.RegistrationScripts
+import TestScripts.DiscoveryScripts
+import TestScripts.AstronomyScripts
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Date (toDateUTC)
+
+-- This module includes 2 tests with the following complete workflows
+-- 1 - Several discoverers register Celestial bodies with the acceptance by the astronomy committe
+-- 2 - A discoverer attemps to register a celestial body, but it gets rejected
+-- 3 - An individual discoverer attemps to update the category of an already existing CB
+-- 4 - An organization attemps to update the properties data of it's discovery
+
+failure_multipleRegistrationWorkflow: Script ()
+failure_multipleRegistrationWorkflow = script do
+    (Parties{..}, acCid) <- createAstronomyCommitteScript
+
+    let drer = discovererData2 individualDiscoverer2
+
+    invalidAC <- submit organizationDiscoverer do 
+        createAstronomyCommitteCmd (organizationDiscoverer, "INVALID") []
+
+    Right r1 <- submitMulti [issuer, individualDiscoverer2] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataCN
+            discovererData = drer
+
+    Right r2 <- submitMulti [issuer, individualDiscoverer2] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataEnc
+            discovererData = drer
+
+    submitMultiMustFail [issuer, individualDiscoverer2] [] do
+        exerciseCmd invalidAC AcceptRegistrationAndCreateCB with
+            registrationCid = r1
+            discovererParty = individualDiscoverer2
+
+    submitMultiMustFail [issuer, individualDiscoverer2] [] do
+        exerciseCmd acCid AcceptRegistrationAndCreateCB with
+            registrationCid = r2
+            discovererParty = individualDiscoverer1
+
+    [] <- query @ErrorLog issuer
+    -- Checking expected Record Logs were created
+    _::_ <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationAttempt)
+    [] <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction /= RegistrationAttempt)
+    _::_ <- query @AstronomyCommitte issuer
+    [] <- query @CelestialBody issuer
+    [] <- query @Discoverer issuer
+
+    pure ()
+
+success_multipleRegistrationWorkflow: Script ()
+success_multipleRegistrationWorkflow = script do
+    (Parties{..}, acCid) <- createAstronomyCommitteScript
+    now <- getTime
+
+    let date = toDateUTC now
+        drer = discovererData2 individualDiscoverer2
+        iDDry1: Text = idAble cbDataCN
+        iDDry2: Text = idAble cbDataEnc
+        dry1 = DiscoveryData with
+            id = iDDry1 
+            ..
+        dry2 = DiscoveryData with
+            id = iDDry2
+            ..
+
+    Right r1 <- submitMulti [issuer, individualDiscoverer2] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataCN
+            discovererData = drer
+
+    Right r2 <- submitMulti [issuer, individualDiscoverer2] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataEnc
+            discovererData = drer
+
+    Right (_, midAcCid, _) <- submitMulti [issuer, individualDiscoverer2] [] do
+        exerciseCmd acCid AcceptRegistrationAndCreateCB with
+            registrationCid = r1
+            discovererParty = individualDiscoverer2
+
+    Right (_, _, _) <- submitMulti [issuer, individualDiscoverer2] [] do
+        exerciseCmd midAcCid AcceptRegistrationAndCreateCB with
+            registrationCid = r2
+            discovererParty = individualDiscoverer2
+
+    [] <- query @ErrorLog issuer
+    -- Checking expected Record Logs were created
+    _::_ <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationAttempt)
+    _::_ <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationAcceptance)
+    _::_ <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationSuccess)
+
+    [(_, qRAC)] <- query @AstronomyCommitte issuer
+    length qRAC.registeredDiscoveries === 2
+
+    [(_, c1),(_, c2)] <- query @CelestialBody issuer
+    c1.cbData === cbDataCN
+    c1.discovererData === drer
+    c1.discoveryData === dry1
+    c2.cbData === cbDataEnc
+    c2.discovererData === drer
+    c2.discoveryData === dry2
+
+    [(_, dC)] <- query @Discoverer issuer
+    dC.discovererData === drer
+    dC.discoveries === [dry1, dry2]
+
+    pure ()
+
+failure_registrationRejectionWorkflow: Script ()
+failure_registrationRejectionWorkflow = script do
+    (Parties{..}, acCid) <- createAstronomyCommitteScript
+
+    Right r1 <- submitMulti [issuer, organizationDiscoverer] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataCN
+            discovererData = discovererData3 organizationDiscoverer
+
+    submitMustFail issuer do
+        exerciseCmd acCid RejectRegistration with
+            registrationCid = r1
+            reason = ""
+
+    [] <- query @ErrorLog issuer
+    -- Checking expected Record Logs were created
+    [_] <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationAttempt)
+    [] <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction /= RegistrationAttempt)
+
+    pure ()
+
+success_registrationRejectionWorkflow: Script ()
+success_registrationRejectionWorkflow = script do
+    (Parties{..}, acCid) <- createAstronomyCommitteScript
+
+    Right r1 <- submitMulti [issuer, organizationDiscoverer] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataCN
+            discovererData = discovererData3 organizationDiscoverer
+
+    Right r2 <- submitMulti [issuer, organizationDiscoverer] [] do
+        exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+            cbData = cbDataEnc
+            discovererData = discovererData3 organizationDiscoverer
+
+    submitMustFail issuer do
+        exerciseCmd acCid RejectRegistration with
+            registrationCid = r1
+            reason = ""
+
+    None <- submit issuer do
+        exerciseCmd acCid RejectRegistration with
+            registrationCid = r2
+            reason = "Lack of evidence."
+
+    [] <- query @ErrorLog issuer
+    -- Checking expected Record Logs were created
+    _::_ <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationAttempt)
+    _::_ <- queryFilter @ActionRecordLog issuer (\log -> log.executedAction == RegistrationRejection)
+
+    pure ()

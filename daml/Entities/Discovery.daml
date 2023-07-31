@@ -1,7 +1,7 @@
 module Entities.Discovery where
 
-import DA.List (unique)
-import DA.Text as T (length) 
+import DA.List (uniqueOn, (!!))
+import DA.Text as T 
 
 template Discoverer
     with
@@ -10,10 +10,12 @@ template Discoverer
         discoveries: [DiscoveryData]
     where
         ensure
-            unique discoveries &&
             issuer /= discovererData.discovererParty &&
             T.length discovererData.name >= 3 &&
-            discoveries /= []
+            validateNonEmptyCbIdList discoveries &&
+                -- Iterating over the list of registered discorveries to ensure all have valid Ids
+            uniqueIdDiscoveriesList discoveries
+                -- Duplicate entries not acceptable, expecially entries that share id
 
         signatory issuer
         observer discovererData.discovererParty
@@ -34,3 +36,30 @@ data DiscovererData = DiscovererData with
 
 data EntityType = Individual | Organization -- Individual requires issuer to update data, while an Organization does not
  deriving (Eq, Show)
+
+class ValidCbId id b where
+    validateCbId: id -> b
+
+instance ValidCbId DiscoveryData Bool where
+    validateCbId DiscoveryData{id} = 
+        let idMoreThan3Char = T.length id > 3
+            thirdCharIsColon = ((T.explode id) !! 2) == ":"
+            firstTwoCharValid = (T.take 2 id) `elem` possiblePrefixOfCbId
+        in
+            idMoreThan3Char && thirdCharIsColon && firstTwoCharValid
+
+possiblePrefixOfCbId: [Text]
+possiblePrefixOfCbId = ["Ga", "Pl", "Ex", "Mi", "Mo", "Ne", "St", "Co", "As", "Cl", "Un"]
+
+uniqueIdDiscoveriesList : (Ord k, HasField "id" r k) => [r] -> Bool
+uniqueIdDiscoveriesList discList = uniqueOn (.id) discList
+
+-- Iterating over the list of registered discorveries to ensure all have valid Ids
+validateCbIdList listOfDiscoveries = 
+    foldr ((&&) . validateCbId) True listOfDiscoveries
+        
+-- A recursive version on how to check how all entries have valid ids
+validateNonEmptyCbIdList : ValidCbId DiscoveryData Bool => [DiscoveryData] -> Bool
+validateNonEmptyCbIdList [] = False
+validateNonEmptyCbIdList [h] = validateCbId h
+validateNonEmptyCbIdList (h::t) = (validateCbId h) && (validateNonEmptyCbIdList t)

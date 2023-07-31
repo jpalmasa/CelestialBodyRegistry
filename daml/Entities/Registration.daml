@@ -8,7 +8,7 @@ import Daml.Script
 import DA.Text as T
 import DA.Date (toDateUTC)
 import DA.Exception (PreconditionFailed(PreconditionFailed), GeneralError(GeneralError))
-import DA.List (delete, unique)
+import DA.List (delete)
 
 template AstronomyCommitte -- Committe Entities responsible for registering astronomy discoveries and that keep them for themselves 
     with
@@ -19,9 +19,11 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
         signatory issuer
 
         ensure
-            unique registeredDiscoveries &&
             T.length issuerName >= 3 &&
-            foldr ((&&) . validateCbId) True registeredDiscoveries -- Ensure all discoveries have valid Ids
+            validateCbIdList registeredDiscoveries &&
+                -- Iterating over the list of registered discorveries to ensure all have valid Ids
+            uniqueIdDiscoveriesList registeredDiscoveries
+                -- Duplicate entries not acceptable, expecially entries that share id
           
         key (issuer, issuerName): (Party, Text)
         maintainer key._1
@@ -70,7 +72,7 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
 
                 create ActionRecordLog with
                     actor = issuer
-                    executedAction = RegistrationAttempt
+                    executedAction = RegistrationAcceptance
                     recordTime = now
                     optReason = None
                     ..
@@ -79,7 +81,7 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
                 exercise registrationCid RegisterCelestialBodyAndDiscoverer with
                     committeCid = self
 
-        nonconsuming choice RevokeRegistration: Optional (ContractId ErrorLog)
+        nonconsuming choice RejectRegistration: Optional (ContractId ErrorLog)
             with
                 registrationCid: ContractId AstronomicalBodyRegistration
                 reason: Text
@@ -87,12 +89,12 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
             do
                 now <- getTime
                 try do
-                    debug "Running RevokeRegistration assertion"
-                    assertMsg "Reason for Revocation of Registration must not be an empty text." $ reason /= ""
+                    debug "Running RejectRegistration assertion"
+                    assertMsg "Reason for Rejection of Registration must not be an empty text." $ reason /= ""
 
                     create ActionRecordLog with
                         actor = issuer
-                        executedAction = RegistrationAttempt
+                        executedAction = RegistrationRejection
                         recordTime = now
                         optReason = Some reason
                         ..
@@ -116,6 +118,8 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
             do
                 debug $ "Running UpdateCelestialBody assertions for cbid: " <> show oldCBId <> "and discoverer" <> show discovererParty
                 assertMsg "Reason for a celestial body's data to be updated must not be an empty text." $ reason /= ""
+
+                recordTime <- getTime
 
                 (cBCid, cB@CelestialBody{cbData = CelestialBodyData{celestialBodyCategory}, discoveryData}) <-
                     fetchByKey @CelestialBody (issuer, oldCBId)
@@ -142,6 +146,12 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
                         newRegisteredDiscoveries = (delete discoveryData registeredDiscoveries) ++ [newDiscoveryData]
                         newDiscovererDiscoveries = (delete discoveryData discoveries) ++ [newDiscoveryData]
                     
+                    create ActionRecordLog with
+                        executedAction = DataUpdateSucess
+                        actor = discovererParty
+                        optReason = Some reason
+                        ..
+
                     newCBCid <- create cB with cbData = newCBData
                     newCommitteCid <- create this with registeredDiscoveries = newRegisteredDiscoveries
                     newDiscovererCid <- create disc with discoveries = newDiscovererDiscoveries
@@ -185,11 +195,14 @@ template AstronomicalBodyRegistration
 
                     discovererCid <- lookupByKey @Discoverer (issuer, discovererData.discovererParty) >>= \case
                         Some discovererCid -> do
-                            let today = toDateUTC now
                             discoverer <- fetch discovererCid
                             archive discovererCid
+
+                            let today = toDateUTC now
+                                newDiscoveriesList = discoverer.discoveries ++ [newDiscoveryData]
+
                             create discoverer with
-                                discoveries = discoverer.discoveries ++ [newDiscoveryData]
+                                discoveries = newDiscoveriesList
                         None -> create Discoverer with discoveries = [newDiscoveryData]; ..
 
                     create ActionRecordLog with
@@ -211,7 +224,6 @@ template AstronomicalBodyRegistration
                     GeneralError ex -> do
                         newErrorLogCid <- createErrorLog E0002 ex issuer discovererData.discovererParty now
                         pure $ Left newErrorLogCid
-
 
 createAstronomyCommitte: (Party, Text) -> [DiscoveryData] -> Script (ContractId AstronomyCommitte)
 createAstronomyCommitte (issuer, issuerName) registeredDiscoveries = script do

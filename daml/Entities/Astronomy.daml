@@ -5,7 +5,6 @@ import Entities.Discovery
 
 import DA.Optional
 import DA.Text as T
-import DA.List ((!!))
 
 template CelestialBody
     with
@@ -21,12 +20,13 @@ template CelestialBody
 
         ensure
             issuer /= discovererData.discovererParty &&
-            idAble cbData /= "" && validateCbId discoveryData &&
+            idAble cbData == discoveryData.id &&
+            fromOptional cbData.name cbData.catalogId /= "" && 
+            validateCbId discoveryData &&
             cbData.celestialBodyProperties.celestialCoordinates.ra /= "" &&
             cbData.celestialBodyProperties.celestialCoordinates.dec /= "" &&
             biggerThanZero cbData.celestialBodyProperties.mass &&
-            biggerThanZero cbData.celestialBodyProperties.distanceFromEarth && 
-            biggerThanZero cbData.celestialBodyProperties.apparentMagnitude
+            biggerThanZero cbData.celestialBodyProperties.averageDistanceFromSun
 
         preconsuming choice IndividualDiscovererUpdatesCelestialBodyProperties: ContractId CelestialBody
             with
@@ -47,6 +47,7 @@ template CelestialBody
                     actor = discovererData.discovererParty
                     optReason = Some reason
                     ..
+                    
                 trace "Individual discoverer updated it's discovered celestial body." $
                     create this with
                         cbData.celestialBodyProperties = newCBProperties
@@ -84,7 +85,7 @@ data CelestialBodyData = CelestialBodyData with
 
 data CelestialBodyProperties = CelestialBodyProperties with
     celestialCoordinates: CelestialCoordinates
-    distanceFromEarth: PhysicalGrandeur
+    averageDistanceFromSun: PhysicalGrandeur
     mass: PhysicalGrandeur
     apparentMagnitude: PhysicalGrandeur
  deriving (Eq, Show)
@@ -94,7 +95,7 @@ data CelestialCoordinates = CelestialCoordinates with
     dec: Text
  deriving (Eq, Show)
 
-data CelestialBodyCategory = Galaxy | Planet | MinorPlanet | Moon | Nebula | Star | Comet | Asteroid | Cluster | Unknown
+data CelestialBodyCategory = Galaxy | Planet | Exoplanet | MinorPlanet | Moon | Nebula | Star | Comet | Asteroid | Cluster | Unknown
  deriving (Eq, Show)
 
 data PhysicalGrandeur = PhysicalGrandeur with
@@ -102,16 +103,7 @@ data PhysicalGrandeur = PhysicalGrandeur with
     unit: Unit
  deriving (Eq, Show)
 
-data Unit = DistanceUnit | MassUnit | ApparentMagnitudeUnit | UnknownUnit
- deriving (Eq, Show)
-
-data DistanceUnit = Km | LightYear | AU
- deriving (Eq, Show)
-
-data MassUnit = Kg | SolasMass
- deriving (Eq, Show)
-
-data ApparentMagnitudeUnit = WattPerSquareMeter
+data Unit =  LightYear | AU | Parsec | Kg | SunMass | EarthMass | NA
  deriving (Eq, Show)
 
 class IdAble celestialBodyData id where
@@ -124,23 +116,4 @@ class BiggerThanZeroProperty celestialBodyData eval where
     biggerThanZero: celestialBodyData -> eval
 
 instance BiggerThanZeroProperty PhysicalGrandeur Bool where
-    biggerThanZero PhysicalGrandeur{value} = value > 0.0
-
-class KnownUnitProperty celestialBodyData eval where
-    knownUnit: celestialBodyData -> eval
-
-instance KnownUnitProperty PhysicalGrandeur Bool where
-    knownUnit PhysicalGrandeur{unit} = unit /= UnknownUnit
-
-class ValidCbId id b where
-    validateCbId: id -> b
-
-instance ValidCbId DiscoveryData Bool where
-    validateCbId DiscoveryData{id} = 
-        let thirdCharIsColon = ((T.explode id) !! 3) == ":"
-            firstTwoCharValid = (T.take 2 id) `elem` possiblePrefixOfCbId
-        in
-            thirdCharIsColon && firstTwoCharValid
-
-possiblePrefixOfCbId: [Text]
-possiblePrefixOfCbId = ["Ga", "Pl", "Mi", "Mo", "Ne", "St", "Co", "As", "Cl", "Un"]
+    biggerThanZero PhysicalGrandeur{..} = (unit == NA) || (value > 0.0)

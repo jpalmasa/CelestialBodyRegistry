@@ -5,9 +5,8 @@
 - [Project Overview](#project-overview)
 - [Features](#features)
 - [Getting Started](#getting-started)
-- [Smart Contract](#smart-contract)
-- [Contributing](#contributing)
-- [License](#license)
+- [Usage](#usage)
+- [Testing](#testing)
 
 ## Introduction
 Celestial Body Registry is a decentralized application built on DAML, allowing individual or organizational users to register and update the data of a Celestial Body (CB) and claim it's discovery in the astronomy committe they are inserted, all registered onto a ledger. Each registered CB is represented as a contract, as well as it's discoverer and the astronomy committe where it's included.
@@ -53,7 +52,7 @@ daml start
 
 1. Access the Star Registry dApp through your web browser. Ensure it is connected to the same network as the deployed DAML smart contract.
 
-2. Mint your first Astro NFT or explore the marketplace to find and trade unique celestial artifacts.
+2. Take your first steps as a discoverer and register a Celestial Body before everybody else
 
 ### Testing
 Run the following command to run tests after performing the previous described step

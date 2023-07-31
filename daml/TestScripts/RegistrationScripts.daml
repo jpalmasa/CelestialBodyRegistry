@@ -1,0 +1,63 @@
+module TestScripts.RegistrationScripts where
+
+import Entities.Registration (AstronomicalBodyRegistration(..), AstronomyCommitte(..))
+
+import TestScripts.Utils
+import TestScripts.DiscoveryScripts
+import TestScripts.AstronomyScripts
+
+import Daml.Script
+
+-- This module includes a useful command to use for the workflow test script and some 
+-- tests on the creation of AstronomyCommitte contracts.
+-- 3 unhappy paths and 1 happy path AstronomyCommitte contract creation.
+-- 1 unhappy path and 1 happy path AstronomicalBodyRegistration contract creation.
+
+-- unhappy path when creating a AstronomyCommitte due to issuer name being too short
+failure_shortNamedAstronomyCommitte = script do
+    Parties{issuer} <- setupUsers
+    submitMustFail issuer do 
+        createAstronomyCommitteCmd (issuer, "AC") []
+
+-- unhappy path when creating a AstronomyCommitte due to duplicate discoveries
+failure_duplicatedDiscoveriesAstronomyCommitte = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    
+    submitMustFail issuer do 
+        createAstronomyCommitteCmd (issuer, "AstronomyCommitte") [discoveryDataPluto, discoveryDataPluto]
+
+-- unhappy path when creating a AstronomyCommitte due to duplicate discoveries
+failure_invalidDiscoveryIdAstronomyCommitte = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let invalidIdDiscovery =
+            discoveryDataPluto with id = "Bla:Pluto"
+
+    submitMustFail issuer do 
+        createAstronomyCommitteCmd (issuer, "AstronomyCommitte") [invalidIdDiscovery]
+
+-- unhappy path when creating a AstronomicalBodyRegistration due to issuer and discoverer parties matching
+failure_invalidRegistrationMatchingIssuer = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+
+    submitMustFail issuer do 
+        createRegistrationCmd issuer (discovererData1 issuer) discoveryDataPluto cbDataPlutoMi
+
+-- happy path of AstronomyCommitte creation
+createAstronomyCommitteScript = script do
+    parties@Parties{issuer}<- setupParties
+    acCid <- submit issuer do 
+        createAstronomyCommitteCmd (issuer, "AstronomyCommitte") []
+    pure (parties, acCid)
+
+-- happy path of AstronomicalBodyRegistration creation
+sucess_createAstronomicalBodyRegistration = script do
+    Parties{issuer, individualDiscoverer1}<- setupUsers
+    submit issuer do 
+        createRegistrationCmd issuer (discovererData1 individualDiscoverer1)
+            discoveryDataPluto cbDataPlutoMi
+
+createAstronomyCommitteCmd (issuer, issuerName) registeredDiscoveries =
+    createCmd AstronomyCommitte with ..
+
+createRegistrationCmd issuer discovererData discoveryData cbData=
+    createCmd AstronomicalBodyRegistration with ..

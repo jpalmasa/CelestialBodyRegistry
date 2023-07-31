@@ -1,0 +1,254 @@
+module TestScripts.AstronomyScripts where
+
+import Entities.Astronomy
+
+import TestScripts.Utils
+import TestScripts.DiscoveryScripts
+
+import Daml.Script
+
+-- This module includes tests the creation of CelestialBody contracts.
+-- 9 unhappy paths and 1 happy path for CelestialBody contract creation.
+
+-- unhappy path when creating a CelestialBody contract, issuer and discoverer parties must not match
+failure_MatchingPartiesCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 issuer
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataPlutoMi now
+
+-- unhappy path when creating a CelestialBody contract with a name or catalogue id that will result in an invalid Id
+failure_invalidCbIdCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        cbDataInvalidId = cbDataPlutoMi with
+            name = "n"
+            catalogId = Some ""
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidId now
+
+-- unhappy path when creating a CelestialBody contract with an empty string as ra
+failure_invalidRaCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        cbDataInvalidRA = cbDataPlutoMi with
+            celestialBodyProperties = cbDataPlutoMi.celestialBodyProperties with
+                celestialCoordinates = cbDataPlutoMi.celestialBodyProperties.celestialCoordinates with
+                    ra = ""
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidRA now
+
+-- unhappy path when creating a CelestialBody contract with an empty string as dec
+failure_invalidDecCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        cbDataInvalidDEC = cbDataPlutoMi with
+            celestialBodyProperties = cbDataPlutoMi.celestialBodyProperties with
+                celestialCoordinates = cbDataPlutoMi.celestialBodyProperties.celestialCoordinates with
+                    dec = ""
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidDEC now
+
+-- unhappy path when creating a CelestialBody contract with an empty string name
+failure_invalidNameCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        invalidDiscoveryData = discoveryDataPluto with id = "Mi:"
+        cbDataInvalidName = cbDataPlutoMi with
+            name = ""
+            catalogId = None
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidName now
+
+-- unhappy path when creating a CelestialBody contract with an empty string catalogId (it takes priority over name)
+failure_invalidCatalogueIdCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        invalidDiscoveryData = discoveryDataPluto with id = "Mi:"
+        cbDataInvalidCatId = cbDataPlutoMi with
+            catalogId = Some ""
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidCatId now
+
+-- unhappy path when creating a CelestialBody contract when it's id and it's discovery's id don't match 
+failure_NonMatchingIdCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        invalidDiscoveryDataId = discoveryDataPluto with id = "Mi:"
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData invalidDiscoveryDataId cbDataPlutoMi now
+
+-- unhappy path when creating a CelestialBody contract when it's mass is zero and has a valid unit
+failure_ZeroMassCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        cbDataInvalidMass = cbDataPlutoMi with
+            celestialBodyProperties = cbDataPlutoMi.celestialBodyProperties with
+                mass = cbDataPlutoMi.celestialBodyProperties.mass with value = 0.0
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidMass now
+
+-- unhappy path when creating a CelestialBody contract when it's distance from sun is zero and has a valid unit
+failure_ZeroDistanceCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+        cbDataInvalidDistance = cbDataPlutoMi with
+            celestialBodyProperties = cbDataPlutoMi.celestialBodyProperties with
+                mass = cbDataPlutoMi.celestialBodyProperties.averageDistanceFromSun with value = 0.0
+
+    submitMultiMustFail [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataInvalidDistance now
+
+-- happy path of Celestial Body creation
+success_createCB = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    now <- getTime
+    let discovererData = discovererData1 individualDiscoverer1
+
+    submitMulti [issuer, individualDiscoverer1] [] do 
+        createCBCmd issuer discovererData discoveryDataPluto cbDataPlutoMi now
+
+createCBCmd issuer discovererData discoveryData cbData registryTime =
+    createCmd CelestialBody with
+        ..
+
+cbDataPlutoPl =
+    CelestialBodyData with
+        name = "Pluto"
+        catalogId = None
+        celestialBodyCategory = Planet
+        celestialBodyProperties = CelestialBodyProperties with
+            celestialCoordinates = CelestialCoordinates with
+                ra = "19h22m30s"
+                dec = "-22º01'00s\""
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 39.5
+                unit = AU
+            mass = PhysicalGrandeur with
+                value = 1.303 * 10.0 ^22
+                unit = Kg
+            apparentMagnitude = PhysicalGrandeur with
+                value = 14.0
+                unit = NA
+        ..
+
+cbDataPlutoMi = cbDataPlutoPl with celestialBodyCategory = MinorPlanet
+
+cbDataAnn =
+    CelestialBodyData with
+        name = "(2839) Annette"
+        catalogId = Some "2839Annette"
+        celestialBodyCategory = Asteroid
+        celestialBodyProperties = CelestialBodyProperties with
+            celestialCoordinates = CelestialCoordinates with
+                ra = "NA"
+                dec = "NA"
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 2.2
+                unit = AU
+            mass = PhysicalGrandeur with
+                value = 0.0
+                unit = NA
+            apparentMagnitude = PhysicalGrandeur with
+                value = 14.0
+                unit = NA
+
+cbDataCN =
+    CelestialBodyData with
+        name = "Cone Nebula"
+        catalogId = Some "NGC2264"
+        celestialBodyCategory = Nebula
+        celestialBodyProperties = CelestialBodyProperties with
+            celestialCoordinates = CelestialCoordinates with
+                ra = "06h41m10s"
+                dec = "+09°29'26\""
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 830.0
+                unit = Parsec
+            mass = PhysicalGrandeur with
+                value = 0.0
+                unit = NA
+            apparentMagnitude = PhysicalGrandeur with
+                value = 3.9
+                unit = NA
+
+cbDataEnc =
+    CelestialBodyData with
+        name = "Enceladus"
+        catalogId = None
+        celestialBodyCategory = Planet
+        celestialBodyProperties = CelestialBodyProperties with
+            celestialCoordinates = CelestialCoordinates with
+                ra = "NA"
+                dec = "NA"
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 0.0
+                unit = NA
+            mass = PhysicalGrandeur with
+                value = 1.080318 * 10.0 ^ 20
+                unit = Kg
+            apparentMagnitude = PhysicalGrandeur with
+                value = 11.7
+                unit = NA
+
+cbDataK452_1 =
+    CelestialBodyData with
+        name = "Kepler-452b"
+        catalogId = None
+        celestialBodyCategory = Exoplanet
+        celestialBodyProperties = CelestialBodyProperties with
+            celestialCoordinates = CelestialCoordinates with
+                ra = "NA"
+                dec = "NA"
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 1400.0
+                unit = LightYear
+            mass = PhysicalGrandeur with
+                value = 5.0
+                unit = EarthMass
+            apparentMagnitude = PhysicalGrandeur with
+                value = 31.5
+                unit = NA
+
+cbDataK452_2 =
+    cbDataK452_1 with
+        celestialBodyProperties = cbDataK452_1.celestialBodyProperties with
+            celestialCoordinates = cbDataK452_1.celestialBodyProperties.celestialCoordinates with
+                ra = "19h44m00.89s"
+                dec = "+44°16'39.2\""
+
+cbDataB58 =
+    CelestialBodyData with
+        name = "BoRG-58"
+        catalogId = None
+        celestialBodyCategory = Galaxy
+        celestialBodyProperties = CelestialBodyProperties with
+            celestialCoordinates = CelestialCoordinates with
+                ra = "14h36m55.1s"
+                dec = "50°43'9.79\""
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 0.0
+                unit = NA
+            mass = PhysicalGrandeur with
+                value = 0.0
+                unit = NA
+            apparentMagnitude = PhysicalGrandeur with
+                value = 31.5
+                unit = NA

@@ -1,4 +1,4 @@
-module Scripts.Utils where
+module TestScripts.Utils where
 
 import Daml.Script
 
@@ -11,7 +11,7 @@ data Parties = Parties with
 setupParties = script do
     issuer <- allocatePartyWithHint "Issuer" (PartyIdHint "ISS") 
     individualDiscoverer1 <- allocatePartyWithHint "Clyde Tombaugh" (PartyIdHint "CT") 
-    individualDiscoverer2 <- allocatePartyWithHint "Charles Messier" (PartyIdHint "CM") 
+    individualDiscoverer2 <- allocatePartyWithHint "Johann Elert Bode" (PartyIdHint "JEB") 
     organizationDiscoverer <- allocatePartyWithHint "NASA" (PartyIdHint "NS") 
 
     pure Parties with ..
@@ -19,9 +19,9 @@ setupParties = script do
 setupUsers = script do
     userParties@Parties{..} <- setupParties
 
-    issuerId <- validateUserId "AstronomyCommitte"   
-    individualDiscoverer1Id <- validateUserId "Clyde"   
-    individualDiscoverer2Id <- validateUserId "Charles"
+    issuerId <- validateUserId "astronomyCommitte"   
+    individualDiscoverer1Id <- validateUserId "clyde"   
+    individualDiscoverer2Id <- validateUserId "bode"
     organizationDiscovererId <- validateUserId "nasa"
 
     createUser (User issuerId (Some issuer)) [CanActAs issuer]  

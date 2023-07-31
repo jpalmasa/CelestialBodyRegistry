@@ -24,8 +24,7 @@ template ErrorLog
 
 data ActionType =
     RegistrationAttempt | RegistrationSuccess | RegistrationAcceptance | RegistrationRejection |
-    DataUpdateAttempt | DataUpdateSucess | DataUpdateAcceptance | DataUpdateRejection |
-    Revocation 
+    DataUpdateAttempt | DataUpdateSucess | DataUpdateAcceptance | DataUpdateRejection
  deriving (Eq, Show)
 
 data ErrorId =

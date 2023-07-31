@@ -1,0 +1,108 @@
+module TestScripts.DiscoveryScripts where
+
+import Entities.Discovery
+
+import TestScripts.Utils
+
+import Daml.Script
+import DA.Date as D
+
+-- This module includes tests the creation of Discoverer contracts.
+-- 5 unhappy paths and 1 happy path Discoverer contract creation scenario.
+
+-- unhappy path when creating discoverer it's name being too short
+failure_shortName = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let discovererData =
+            (discovererData1 individualDiscoverer1) with
+                name = "D"
+    submitMustFail issuer do 
+        createDiscoveryCmd issuer discovererData [discoveryDataPluto]
+
+-- unhappy path when creating discoverer, issuer and discoverer parties must not match
+failure_MatchingParties = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let discovererData = discovererData1 issuer
+    submitMustFail issuer do 
+        createDiscoveryCmd issuer discovererData [discoveryDataPluto]
+
+-- unhappy path when creating discoverer without discoveries
+failure_DiscovererWithNoDiscoveries = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let discovererData = discovererData1 individualDiscoverer1
+    submitMustFail issuer do 
+        createDiscoveryCmd issuer discovererData []
+
+-- unhappy path when creating discoverer with discoveries with duplicated ids
+failure_duplicatedDiscoveriesDiscoverer = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let discovererData = discovererData1 individualDiscoverer1
+    submitMustFail issuer do 
+        createDiscoveryCmd issuer discovererData $ replicate 5 discoveryDataPluto
+
+-- unhappy path when creating discoverer with discoveries with invalid id
+failure_invalidDiscoveryIdDiscoverer = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let invalidIdDiscovery =
+            discoveryDataPluto with id = "Bla:Pluto"
+        discovererData = discovererData1 individualDiscoverer1
+    submitMustFail issuer do 
+        createDiscoveryCmd issuer discovererData [invalidIdDiscovery]
+
+-- happy path of discoverer creation
+sucess_createDiscoverer = script do
+    Parties{issuer, individualDiscoverer1} <- setupParties
+    let discovererData = discovererData1 individualDiscoverer1
+    submit issuer do 
+        createDiscoveryCmd issuer discovererData [discoveryDataPluto, discoveryDataAnnette]
+
+createDiscoveryCmd issuer discovererData discoveries =
+    createCmd Discoverer with ..
+
+discovererData1 individualDiscoverer =
+    DiscovererData with
+        discovererParty = individualDiscoverer
+        name = "Clyde Tombaugh"
+        entityType = Individual
+
+discovererData2 individualDiscoverer =
+    DiscovererData with
+        discovererParty = individualDiscoverer
+        name = "William Herschel"
+        entityType = Individual
+
+discovererData3 individualDiscoverer =
+    DiscovererData with
+        discovererParty = individualDiscoverer
+        name = "National Aeronautics and Space Administration"
+        entityType = Organization
+
+discoveryDataPluto =
+    DiscoveryData with
+        id = "Mi:Pluto"
+        date = D.date 1930 D.Feb 18
+
+discoveryDataAnnette =
+    DiscoveryData with
+        id = "As:Annete2839"
+        date = D.date 1929 D.Oct 5
+
+discoveryDataCN =
+    DiscoveryData with
+        id = "Ne:NGC2264"
+        date = D.date 1785 D.Dec 26
+
+discoveryDataEnc =
+    DiscoveryData with
+        id = "Mo:Enceladus"
+        date = D.date 1789 D.Aug 28
+
+discoveryK452 =
+    DiscoveryData with
+        id = "Mo:Enceladus"
+        date = D.date 2015 D.Jul 23
+
+discoveryB58 =
+    DiscoveryData with
+        id = "Ga:BoRG-58"
+        date = D.date 2012 D.Jan 10
