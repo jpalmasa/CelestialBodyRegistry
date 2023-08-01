@@ -103,7 +103,7 @@ data PhysicalGrandeur = PhysicalGrandeur with
     unit: Unit
  deriving (Eq, Show)
 
-data Unit =  LightYear | AU | Parsec | Kg | SunMass | EarthMass | NA
+data Unit =  Km | LightYear | AU | Parsec | Kg | SunMass | EarthMass | NA
  deriving (Eq, Show)
 
 class IdAble celestialBodyData id where

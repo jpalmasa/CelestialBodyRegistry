@@ -208,6 +208,13 @@ cbDataEnc =
                 value = 11.7
                 unit = NA
 
+cbDataEnc_2 =
+    cbDataEnc with
+        celestialBodyProperties = cbDataK452_1.celestialBodyProperties with
+            averageDistanceFromSun = PhysicalGrandeur with
+                value = 1.5 * 10.0 ^ 9
+                unit = Km
+                
 cbDataK452_1 =
     CelestialBodyData with
         name = "Kepler-452b"

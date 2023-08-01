@@ -107,7 +107,7 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
                         newErrorLogCid <- createErrorLog E0002 ex issuer issuer now
                         pure $ Some newErrorLogCid
 
-        preconsuming choice UpdateCelestialBodyData:
+        nonconsuming choice UpdateCelestialBodyData:
             (ContractId CelestialBody, ContractId AstronomyCommitte, ContractId Discoverer)
             with
                 oldCBId: Text
@@ -117,7 +117,6 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
             controller issuer, discovererParty
             do
                 debug $ "Running UpdateCelestialBody assertions for cbid: " <> show oldCBId <> "and discoverer" <> show discovererParty
-                assertMsg "Reason for a celestial body's data to be updated must not be an empty text." $ reason /= ""
 
                 recordTime <- getTime
 
@@ -136,11 +135,13 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
 
                     pure $ trace (oldCBId <> "Celestial Body's data was updated.") $ (newCBCid, self, discCid)
                 else do
+                    assertMsg "Reason for a celestial body's data to be updated must not be an empty text." $ reason /= ""
                     assertMsg "Unexpected error. Discovery data to update does not exist on committe" $ elem discoveryData registeredDiscoveries
                     assertMsg "Unexpected error. Discovery data to update does not exist on discoverer" $ elem discoveryData discoveries
 
                     archive cBCid
                     archive discCid
+                    archive self
                     
                     let newDiscoveryData = cB.discoveryData with id = idAble newCBData
                         newRegisteredDiscoveries = (delete discoveryData registeredDiscoveries) ++ [newDiscoveryData]
@@ -152,7 +153,7 @@ template AstronomyCommitte -- Committe Entities responsible for registering astr
                         optReason = Some reason
                         ..
 
-                    newCBCid <- create cB with cbData = newCBData
+                    newCBCid <- create cB with cbData = newCBData; discoveryData = newDiscoveryData
                     newCommitteCid <- create this with registeredDiscoveries = newRegisteredDiscoveries
                     newDiscovererCid <- create disc with discoveries = newDiscovererDiscoveries
 

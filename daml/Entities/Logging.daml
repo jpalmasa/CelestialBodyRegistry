@@ -23,8 +23,8 @@ template ErrorLog
         observer actor
 
 data ActionType =
-    RegistrationAttempt | RegistrationSuccess | RegistrationAcceptance | RegistrationRejection |
-    DataUpdateAttempt | DataUpdateSucess | DataUpdateAcceptance | DataUpdateRejection
+    RegistrationAttempt | RegistrationSuccess | RegistrationAcceptance |
+    RegistrationRejection | DataUpdateSucess
  deriving (Eq, Show)
 
 data ErrorId =
