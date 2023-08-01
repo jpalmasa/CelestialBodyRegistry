@@ -13,6 +13,7 @@ import TestScripts.AstronomyScripts
 import Daml.Script
 import DA.Assert ((=/=), (===))
 import DA.Date (toDateUTC)
+import DA.Foldable (forA_)
 
 -- This module includes 2 tests with the following complete workflows
 -- 1 -  Several discoverers register Celestial bodies with the acceptance by the astronomy committe. 3 unhappy paths 1 happy path
@@ -81,9 +82,9 @@ failure_registrationWorkflow_unathorizedParty = script do
 
     pure ()
 
-failure_registrationWorkflow_invalidCbData: Script ()
+failure_registrationWorkflow_invalidCbData: Script (Parties)
 failure_registrationWorkflow_invalidCbData = script do
-    (Parties{..}, acCid) <- createAstronomyCommitteScript
+    (parties@Parties{..}, acCid) <- createAstronomyCommitteScript
 
     let drer = discovererData2 individualDiscoverer2
 
@@ -111,7 +112,7 @@ failure_registrationWorkflow_invalidCbData = script do
     [] <- query @CelestialBody issuer
     [] <- query @Discoverer issuer
 
-    pure ()
+    pure (parties)
 
 success_multipleRegistrationWorkflow: Script ()
 success_multipleRegistrationWorkflow = script do
@@ -371,3 +372,16 @@ success_dataUpdateWorkflow = script do
     [_,_,_] <- query @Discoverer issuer
 
     pure ()
+
+test_archivalOfLoggingEntities: Script ()
+test_archivalOfLoggingEntities = script do
+    Parties{..} <- failure_registrationWorkflow_invalidCbData
+    [(eCid,_)] <- query @ErrorLog issuer
+    r <- query @ActionRecordLog issuer
+
+    submit issuer do
+        archiveCmd eCid 
+
+    forA_ r $ \(cid,_) ->
+        submit issuer do
+            archiveCmd cid
