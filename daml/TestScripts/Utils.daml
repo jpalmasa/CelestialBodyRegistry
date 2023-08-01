@@ -24,13 +24,14 @@ setupUsers = script do
     individualDiscoverer2Id <- validateUserId "bode"
     organizationDiscovererId <- validateUserId "nasa"
 
-    createUser (User issuerId (Some issuer)) [CanActAs issuer]  
+    createUser (User issuerId (Some issuer)) [CanActAs issuer, CanActAs individualDiscoverer1, CanActAs individualDiscoverer2
+        , CanActAs organizationDiscoverer]  
     -- In this case and to ensure some choices that require both issuer and discoverer control work on Navigator
     createUser (User individualDiscoverer1Id (Some individualDiscoverer1))
-        [CanActAs individualDiscoverer1, CanActAs issuer]  
+        [CanActAs individualDiscoverer1]  
     createUser (User individualDiscoverer2Id (Some individualDiscoverer2))
-        [CanActAs individualDiscoverer2, CanActAs issuer]  
+        [CanActAs individualDiscoverer2]  
     createUser (User organizationDiscovererId (Some organizationDiscoverer))
-        [CanActAs organizationDiscoverer, CanActAs issuer]  
+        [CanActAs organizationDiscoverer]  
 
     pure userParties
