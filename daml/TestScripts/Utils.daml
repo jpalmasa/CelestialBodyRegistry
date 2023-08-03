@@ -28,10 +28,10 @@ setupUsers = script do
         , CanActAs organizationDiscoverer]  
     -- In this case and to ensure some choices that require both issuer and discoverer control work on Navigator
     createUser (User individualDiscoverer1Id (Some individualDiscoverer1))
-        [CanActAs individualDiscoverer1]  
+        [CanActAs individualDiscoverer1, CanActAs issuer]  
     createUser (User individualDiscoverer2Id (Some individualDiscoverer2))
-        [CanActAs individualDiscoverer2]  
+        [CanActAs individualDiscoverer2, CanActAs issuer]  
     createUser (User organizationDiscovererId (Some organizationDiscoverer))
-        [CanActAs organizationDiscoverer]  
+        [CanActAs organizationDiscoverer, CanActAs issuer]  
 
     pure userParties
