@@ -285,6 +285,29 @@ registerAll = script do
 
     pure (Parties{..}, finalACCid)
 
+registerATon: Int -> Parties -> Script()
+registerATon numberOfRecords Parties{..} = script do
+    forA_ [1..numberOfRecords] $ \n -> do
+        (acCid, _) ::_ <- query @AstronomyCommitte issuer
+        let drer = case n % 3 of 
+                0 -> discovererData1 individualDiscoverer1
+                1 -> discovererData2 individualDiscoverer2
+                _ -> discovererData3 organizationDiscoverer
+
+            cbData =
+                cbDataK452_1 with
+                    name = cbDataK452_1.name <> show n
+
+        Right r <- submitMulti [issuer, drer.discovererParty] [] do
+            exerciseCmd acCid ProcessAstronomicalBodyRegistration with
+                cbData
+                discovererData = drer
+
+        submitMulti [issuer, drer.discovererParty] [] do
+            exerciseCmd acCid AcceptRegistrationAndCreateCB with
+                registrationCid = r
+                discovererParty = drer.discovererParty
+
 failure_dataUpdateWorkflow: Script ()
 failure_dataUpdateWorkflow = script do
     (Parties{..}, acCid) <- registerAll
@@ -318,7 +341,7 @@ failure_dataUpdateWorkflow_sameData = script do
 
 success_dataUpdateWorkflow: Script ()
 success_dataUpdateWorkflow = script do
-    (Parties{..}, acCid) <- registerAll
+    (parties@Parties{..}, acCid) <- registerAll
 
     -- Checking no Record Logs were created
     [] <- query @ErrorLog issuer
@@ -370,6 +393,8 @@ success_dataUpdateWorkflow = script do
     [_,_,_,_,_,_] <- query @CelestialBody issuer
     -- Checking 3 discovereres were created
     [_,_,_] <- query @Discoverer issuer
+
+    registerATon 100 parties
 
     pure ()
 

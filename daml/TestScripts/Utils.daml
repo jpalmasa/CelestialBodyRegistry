@@ -19,10 +19,10 @@ setupParties = script do
 setupUsers = script do
     userParties@Parties{..} <- setupParties
 
-    issuerId <- validateUserId "astronomyCommitte"   
-    individualDiscoverer1Id <- validateUserId "clyde"   
-    individualDiscoverer2Id <- validateUserId "bode"
-    organizationDiscovererId <- validateUserId "nasa"
+    issuerId <- validateUserId "EUAstronomyCommitte"   
+    individualDiscoverer1Id <- validateUserId "clydeT"   
+    individualDiscoverer2Id <- validateUserId "jBode"
+    organizationDiscovererId <- validateUserId "NASA"
 
     createUser (User issuerId (Some issuer)) [CanActAs issuer, CanActAs individualDiscoverer1, CanActAs individualDiscoverer2
         , CanActAs organizationDiscoverer]  

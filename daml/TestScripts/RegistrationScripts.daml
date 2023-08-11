@@ -44,7 +44,7 @@ failure_invalidRegistrationMatchingIssuer = script do
 
 -- happy path of AstronomyCommitte creation
 createAstronomyCommitteScript = script do
-    parties@Parties{issuer}<- setupParties
+    parties@Parties{issuer}<- setupUsers
     acCid <- submit issuer do 
         createAstronomyCommitteCmd (issuer, "AstronomyCommitte") []
     pure (parties, acCid)

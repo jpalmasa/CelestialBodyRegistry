@@ -1,7 +1,7 @@
 sdk-version: 2.6.5
 name: CelestialBodyRegistry
 source: daml
-init-script: TestScripts.Utils:setupUsers
+init-script: TestScripts.Main:success_dataUpdateWorkflow
 version: 0.0.1
 dependencies:
   - daml-prim
@@ -9,3 +9,18 @@ dependencies:
   - daml-script
 build-options: ["--ghc-option", "-Werror",
                 "--ghc-option", "-v"]
+
+# daml ledger upload-dar .daml/dist/CelestialBodyRegistry-0.0.1.dar --host=localhost --port=4000
+# daml navigator server localhost 4000 --port 7500
+
+# comandos especificos para o meu projecto daml
+# daml script --dar .daml/dist/CelestialBodyRegistry-0.0.1.dar --script-name TestScripts.Main:success_dataUpdateWorkflow --ledger-host localhost --ledger-port 4000
+# daml script --dar .daml/dist/CelestialBodyRegistry-0.0.1.dar --script-name TestScripts.Utils:setupUsers --ledger-host localhost --ledger-port 4000
+
+# pg_dump -U postgres -W -Fp participant1 -f dumps/p1_dump_pre.sql
+# pg_dump -U postgres -W -Fp domain1 -f dumps/d1_dump_pre.sql
+# pg_dump -U postgres -W -Fp participant1 -f dumps/p1_dump_pos.sql
+# pg_dump -U postgres -W -Fp domain1 -f dumps/d1_dump_pos.sql
+# docker cp 06c690f03322c3726b13fb2d20403493acfde8028d9328cd7f619dae38729cc1:/dumps /Users/joaopalmasantos/Desktop/Projectos/CelestialBodyRegistry
+
+# grpcurl -plaintext -d '{"ledgerId":"participant1","filter":{"filtersByParty":{"ISS::12207907dbf61e8e8ec7fcff8bd2015d35a2d1bd6da158bd715a9357bcdcf008435f":{}}},"begin":{"absolute":"000000000000000000"}}' localhost:4000 com.daml.ledger.api.v1.TransactionService/GetTransactionTrees
